@@ -211,11 +211,21 @@ int mi_unique_comp(MI_UNIQUEDEF *def, const uchar *a, const uchar *b,
       memcpy((char**) &pos_a, pos_a+keyseg->bit_start, sizeof(char*));
       memcpy((char**) &pos_b, pos_b+keyseg->bit_start, sizeof(char*));
     }
-    if (type == HA_KEYTYPE_TEXT || type == HA_KEYTYPE_VARTEXT1 ||
-        type == HA_KEYTYPE_VARTEXT2)
+    if (type == HA_KEYTYPE_TEXT)
     {
-      if (ha_compare_text(keyseg->charset, (uchar *) pos_a, a_length,
-                                           (uchar *) pos_b, b_length, 0))
+      if (keyseg->charset->coll->strnncollsp_nchars(keyseg->charset,
+                        (uchar *) pos_a, a_length,
+                        (uchar *) pos_b, b_length,
+                        keyseg->length / keyseg->charset->mbmaxlen,
+                        MY_STRNNCOLLSP_NCHARS_EMULATE_TRIMMED_TRAILING_SPACES))
+        return 1;
+    }
+    else if (type == HA_KEYTYPE_VARTEXT1 ||
+             type == HA_KEYTYPE_VARTEXT2)
+    {
+      if (keyseg->charset->coll->strnncollsp(keyseg->charset,
+                                             (uchar *) pos_a, a_length,
+                                             (uchar *) pos_b, b_length))
         return 1;
     }
     else

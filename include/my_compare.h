@@ -110,8 +110,39 @@ static inline void set_rec_bits(uint16 bits, uchar *ptr, uchar ofs, uint len)
 #define clr_rec_bits(bit_ptr, bit_ofs, bit_len) \
   set_rec_bits(0, bit_ptr, bit_ofs, bit_len)
 
-extern int ha_compare_text(CHARSET_INFO *, const uchar *, size_t,
-                           const uchar *, size_t , my_bool);
+
+static inline int ha_compare_char_varying(CHARSET_INFO *charset_info,
+                                          const uchar *a, size_t a_length,
+                                          const uchar *b, size_t b_length,
+                                          my_bool b_is_prefix)
+{
+  if (!b_is_prefix)
+    return charset_info->coll->strnncollsp(charset_info, a, a_length,
+                                                         b, b_length);
+  return charset_info->coll->strnncoll(charset_info,
+                                       a, a_length,
+                                       b, b_length, TRUE/*prefix*/);
+}
+
+
+static inline int ha_compare_char_fixed(CHARSET_INFO *charset_info,
+                                        const uchar *a, size_t a_length,
+                                        const uchar *b, size_t b_length,
+                                        size_t nchars,
+                                        my_bool b_is_prefix)
+{
+  if (!b_is_prefix)
+    return charset_info->coll->strnncollsp_nchars(charset_info,
+                                                  a, a_length,
+                                                  b, b_length,
+                                                  nchars,
+         MY_STRNNCOLLSP_NCHARS_EMULATE_TRIMMED_TRAILING_SPACES);
+  return charset_info->coll->strnncoll(charset_info,
+                                       a, a_length,
+                                       b, b_length, TRUE/*prefix*/);
+}
+
+
 extern int ha_key_cmp(HA_KEYSEG *keyseg, const uchar *a,
 		      const uchar *b, uint key_length, uint nextflag,
 		      uint *diff_pos);
