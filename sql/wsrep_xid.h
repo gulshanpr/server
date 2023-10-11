@@ -24,7 +24,7 @@
 #include "wsrep/gtid.hpp"
 #include "handler.h" // XID typedef
 
-void wsrep_xid_init(xid_t*, const wsrep::gtid&, const wsrep_server_gtid_t&);
+void wsrep_xid_init(XID*, const wsrep::gtid&, const wsrep_server_gtid_t&);
 const wsrep::id& wsrep_xid_uuid(const XID&);
 wsrep::seqno wsrep_xid_seqno(const XID&);
 
