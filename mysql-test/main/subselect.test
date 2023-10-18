@@ -5990,9 +5990,22 @@ drop table t1;
 --echo #
 --echo # MDEV-7565: Server crash with Signal 6 (part 2)
 --echo #
+create table t1 (c int);
+create table t2 (c int);
+insert into t1 values (1), (2);
+
+--error ER_SUBQUERY_NO_1_ROW
+Select
+  (Select Sum(`TestCase`.Revenue) From t1 E
+    Where TestCase.TemplateID not in (Select 1 from t1 where 2=2)
+  ) As `ControlRev`
+From
+(Select  3 as Revenue, 4 as TemplateID) As `TestCase`
+Group By  TestCase.Revenue, TestCase.TemplateID;
+
 Select 
-  (Select Sum(`TestCase`.Revenue) From mysql.slow_log E           
-    Where TestCase.TemplateID not in (Select 1 from mysql.slow_log where 2=2)
+  (Select Sum(`TestCase`.Revenue) From t2 E
+    Where TestCase.TemplateID not in (Select 1 from t2 where 2=2)
   ) As `ControlRev`
 From 
 (Select  3 as Revenue, 4 as TemplateID) As `TestCase` 
@@ -6006,11 +6019,31 @@ Group By  TestCase.Revenue, TestCase.TemplateID;
 CREATE PROCEDURE procedure2()
 BEGIN
   Select 
-    (Select Sum(`TestCase`.Revenue) From mysql.slow_log E           
-      Where TestCase.TemplateID not in (Select 1 from mysql.slow_log where 2=2)
+    (Select Sum(`TestCase`.Revenue) From t1 E
+      Where TestCase.TemplateID not in (Select 1 from t1 where 2=2)
      ) As `ControlRev`
   From 
   (Select  3 as Revenue, 4 as TemplateID) As `TestCase` 
+  Group By  TestCase.Revenue, TestCase.TemplateID;
+
+END |
+--delimiter ;
+--error ER_SUBQUERY_NO_1_ROW
+call procedure2();
+--error ER_SUBQUERY_NO_1_ROW
+call procedure2();
+
+drop procedure procedure2;
+
+--delimiter |
+CREATE PROCEDURE procedure2()
+BEGIN
+  Select
+    (Select Sum(`TestCase`.Revenue) From t2 E
+      Where TestCase.TemplateID not in (Select 1 from t2 where 2=2)
+     ) As `ControlRev`
+  From
+  (Select  3 as Revenue, 4 as TemplateID) As `TestCase`
   Group By  TestCase.Revenue, TestCase.TemplateID;
 
 END |
@@ -6019,7 +6052,7 @@ call procedure2();
 call procedure2();
 
 drop procedure procedure2;
-
+drop table t1,t2;
 
 --echo #
 --echo # MDEV-7846:Server crashes in Item_subselect::fix
