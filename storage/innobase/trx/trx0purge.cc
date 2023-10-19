@@ -971,9 +971,6 @@ inline trx_purge_rec_t purge_sys_t::get_next_rec(roll_ptr_t roll_ptr)
   ut_ad(tail.trx_no < low_limit_no());
   ut_ad(rseg->latch.is_write_locked());
 
-  page_id_t page_id{rseg->space->id, page_no};
-  bool locked= true;
-
   if (!offset)
   {
     /* It is the dummy undo log record, which means that there is no
@@ -981,12 +978,15 @@ inline trx_purge_rec_t purge_sys_t::get_next_rec(roll_ptr_t roll_ptr)
     rseg_get_next_history_log();
 
     /* Look for the next undo log and record to purge */
-    choose_next_log();
+    if (choose_next_log())
+      rseg->latch.wr_unlock();
     return {nullptr, 1};
   }
 
   ut_ad(offset == uint16_t(roll_ptr));
 
+  page_id_t page_id{rseg->space->id, page_no};
+  bool locked= true;
   buf_block_t *b= get_page(page_id);
   if (UNIV_UNLIKELY(!b))
   {
