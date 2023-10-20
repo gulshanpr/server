@@ -907,11 +907,7 @@ void purge_sys_t::rseg_get_next_history_log()
 bool purge_sys_t::choose_next_log()
 {
   if (!rseg_iter.set_next())
-  {
-    /* There is nothing to do yet. */
-    std::this_thread::yield();
     return false;
-  }
 
   hdr_offset= rseg->last_offset();
   hdr_page_no= rseg->last_page_no;
