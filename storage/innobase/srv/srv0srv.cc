@@ -1673,7 +1673,8 @@ first_loop:
       break;
     }
   }
-  while (!srv_purge_should_exit(history_size));
+  while (purge_sys.enabled() && !purge_sys.paused() &&
+         !srv_purge_should_exit(history_size));
 
   if (wakeup)
     purge_coordinator_timer->set_time(10, 0);
