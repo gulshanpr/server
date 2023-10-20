@@ -2159,7 +2159,6 @@ static void innodb_ddl_recovery_done(handlerton*)
     if (srv_start_after_restore && !high_level_read_only)
       drop_garbage_tables_after_restore();
     srv_init_purge_tasks();
-    purge_sys.coordinator_startup();
   }
 }
 

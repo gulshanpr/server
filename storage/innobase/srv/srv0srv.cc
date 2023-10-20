@@ -1269,7 +1269,7 @@ static void purge_coordinator_callback(void*);
 static void purge_truncation_callback(void*)
 {
   purge_sys.latch.rd_lock(SRW_LOCK_CALL);
-  const purge_sys_t::iterator head= purge_sys.head;
+  const purge_sys_t::iterator head{purge_sys.head};
   purge_sys.latch.rd_unlock();
   head.free_history();
 }
@@ -1289,36 +1289,10 @@ static tpool::timer *purge_coordinator_timer;
 /** Wake up the purge threads if there is work to do. */
 void purge_sys_t::wake_if_not_active()
 {
-  if (enabled() && !paused() && !purge_state.m_running)
-  {
-    if (srv_undo_log_truncate);
-    else if (!trx_sys.history_exists())
-      return;
-    else
-    {
-      purge_coordinator_timer->disarm();
-      for (;;)
-      {
-        latch.wr_lock(SRW_LOCK_CALL);
-        if (purge_state.m_running)
-        {
-          latch.wr_unlock();
-          return;
-        }
-        if (!m_SYS_paused)
-          break;
-        latch.wr_unlock();
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
-      }
-      trx_sys.clone_oldest_view(&view);
-      const trx_id_t purged= head.trx_no, limit= view.low_limit_no();
-      latch.wr_unlock();
-      if (purged > limit)
-        return;
-    }
-    if (++purge_state.m_running == 1)
-      srv_thread_pool->submit_task(&purge_coordinator_task);
-  }
+  if (enabled() && !paused() && !purge_state.m_running &&
+      (srv_undo_log_truncate || trx_sys.history_exists()) &&
+      ++purge_state.m_running == 1)
+    srv_thread_pool->submit_task(&purge_coordinator_task);
 }
 
 /** @return whether the purge tasks are active */
@@ -1774,6 +1748,7 @@ void srv_init_purge_tasks()
   purge_create_background_thds(srv_n_purge_threads);
   purge_coordinator_timer= srv_thread_pool->create_timer
     (purge_coordinator_callback, nullptr);
+  purge_sys.coordinator_startup();
 }
 
 static void srv_shutdown_purge_tasks()

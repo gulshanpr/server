@@ -260,8 +260,7 @@ public:
   bool paused()
   { return m_paused != 0; }
 
-  /** Enable purge at startup. Not protected by latch; the main thread
-  will wait for purge_sys.enabled() in srv_start() */
+  /** Enable purge at startup. */
   void coordinator_startup()
   {
     ut_ad(!enabled());
