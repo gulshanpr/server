@@ -1284,8 +1284,6 @@ static tpool::task_group purge_truncation_task_group(1);
 static tpool::waitable_task purge_truncation_task
   (purge_truncation_callback, nullptr, &purge_truncation_task_group);
 
-static tpool::timer *purge_coordinator_timer;
-
 /** Wake up the purge threads if there is work to do. */
 void purge_sys_t::wake_if_not_active()
 {
@@ -1602,9 +1600,6 @@ inline void purge_coordinator_state::do_purge()
 {
   ut_ad(!srv_read_only_mode);
   uint n_threads= 0;
-  bool wakeup= false;
-
-  purge_coordinator_timer->disarm();
 
   if (!purge_sys.enabled() || purge_sys.paused())
     return;
@@ -1631,53 +1626,33 @@ inline void purge_coordinator_state::do_purge()
 first_loop:
     ut_ad(n_threads);
 
-    wakeup= false;
-    const auto sigcount= m_running;
     history_size= trx_sys.history_size();
 
     if (!history_size)
     {
+    no_history:
       srv_dml_needed_delay= 0;
+      purge_truncation_task.wait();
+      trx_purge_truncate_history();
+      srv_dml_needed_delay= 0;
+      break;
+    }
+
+    ulint n_pages_handled= trx_purge(n_threads, history_size);
+    if (!trx_sys.history_exists())
+      goto no_history;
+    if (purge_sys.truncate.current || srv_shutdown_state != SRV_SHUTDOWN_NONE)
+    {
       purge_truncation_task.wait();
       trx_purge_truncate_history();
     }
     else
-    {
-      ulint n_pages_handled= trx_purge(n_threads, history_size);
-      if (purge_sys.truncate.current ||
-          srv_shutdown_state != SRV_SHUTDOWN_NONE)
-      {
-        purge_truncation_task.wait();
-        trx_purge_truncate_history();
-      }
-      else
-        srv_thread_pool->submit_task(&purge_truncation_task);
-      if (n_pages_handled)
-        continue;
-    }
-
-    if (m_running == sigcount && !srv_dml_needed_delay)
-    {
-      /* Purge was not woken up by purge_sys_t::wake_if_not_active() */
-
-      /* The magic number 5000 is an approximation for the case where we have
-      cached undo log records which prevent truncate of rollback segments. */
-      wakeup= history_size >= 5000 ||
-        (history_size && history_size != trx_sys.history_size_approx());
+      srv_thread_pool->submit_task(&purge_truncation_task);
+    if (!n_pages_handled)
       break;
-    }
-
-    if (!trx_sys.history_exists())
-    {
-      srv_dml_needed_delay= 0;
-      break;
-    }
   }
   while (purge_sys.enabled() && !purge_sys.paused() &&
          !srv_purge_should_exit(history_size));
-
-  if (wakeup)
-    purge_coordinator_timer->set_time(10, 0);
 
   m_running= 0;
 }
@@ -1747,16 +1722,12 @@ static void purge_coordinator_callback(void*)
 void srv_init_purge_tasks()
 {
   purge_create_background_thds(srv_n_purge_threads);
-  purge_coordinator_timer= srv_thread_pool->create_timer
-    (purge_coordinator_callback, nullptr);
   purge_sys.coordinator_startup();
 }
 
 static void srv_shutdown_purge_tasks()
 {
   purge_coordinator_task.disable();
-  delete purge_coordinator_timer;
-  purge_coordinator_timer= nullptr;
   purge_worker_task.wait();
   std::unique_lock<std::mutex> lk(purge_thd_mutex);
   while (!purge_thds.empty())
