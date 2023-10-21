@@ -132,7 +132,7 @@ a	b
 3	ccc
 4	ddd
 connection child2_1;
-select argument from mysql.general_log where argument like "select sql_no_cache%";
+select argument from mysql.general_log where argument like "select sql_no_cache%" limit 1;
 argument
 select sql_no_cache t0.`a` `a`,t0.`b` `b` from `auto_test_remote`.`tbl_a` t0
 SET global general_log = @old_general_log;
@@ -201,7 +201,7 @@ max(a)
 4
 connection child2_1;
 select argument from mysql.general_log
-where argument like "select `a` %force index (primary)%";
+where argument like "select `a` %force index (primary)%" limit 1;
 argument
 select `a` from `auto_test_remote`.`tbl_a` FORCE INDEX (PRIMARY) order by `a` desc limit 1
 SET global general_log = @old_general_log;
